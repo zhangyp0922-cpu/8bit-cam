@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>8-Bit Retro Camera</title>
+    <style>
+        /* 引入复古像素字体 (可选) */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            background-color: #222;
+            color: #0f0;
+            font-family: 'Press Start 2P', monospace; /* 复古字体 */
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 16px;
+            margin-top: 15px;
+            text-shadow: 2px 2px #000;
+        }
+
+        /* 隐藏原始视频流，我们只看处理过的 Canvas */
+        #rawVideo {
+            display: none;
+        }
+
+        /* 画布容器 */
+        .viewport {
+            position: relative;
+            width: 90%;
+            max-width: 400px;
+            aspect-ratio: 3/4;
+            margin: 20px 0;
+            border: 4px solid #555;
+            background: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
+
+        /* 核心：将 Canvas 强制拉伸并保持像素化 */
+        #displayCanvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; /* 关键：像素风格不模糊 */
+            image-rendering: crisp-edges;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #cc0000;
+            border: 4px solid #fff;
+            color: #fff;
+            padding: 15px 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000;
+            active: transform: translate(2px, 2px);
+        }
+        
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+
+        #saveBtn {
+            background: #0000cc;
+        }
+
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>8-BIT CAM</h1>
+
+    <div class="viewport">
+        <div class="scanline"></div>
+        <canvas id="displayCanvas"></canvas>
+    </div>
+
+    <video id="rawVideo" autoplay playsinline></video>
+
+    <div class="controls">
+        <button id="snapBtn">SHOOT</button>
+        <button id="downloadBtn" style="display:none;">SAVE</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('rawVideo');
+        const canvas = document.getElementById('displayCanvas');
+        const ctx = canvas.getContext('2d');
+        const snapBtn = document.getElementById('snapBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // 设置 "低分辨率" 的尺寸，这是产生像素感的关键
+        // 越小越复古，建议 64 - 128 之间
+        const lowResWidth = 128; 
+        let lowResHeight = 0; // 将根据比例自动计算
+
+        let isStreaming = false;
+        let animationId;
+
+        // 1. 启动摄像头
+        async function startCamera() {
+            try {
+                // facingMode: "environment" 优先调用后置摄像头
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+                video.srcObject = stream;
+                video.play();
+            } catch (err) {
+                alert("无法访问摄像头: " + err.message + "\n请确保使用 HTTPS 或 localhost 访问。");
+            }
+        }
+
+        // 2. 视频元数据加载完成后，初始化 Canvas 尺寸
+        video.addEventListener('loadedmetadata', () => {
+            const aspectRatio = video.videoHeight / video.videoWidth;
+            lowResHeight = Math.floor(lowResWidth * aspectRatio);
+            
+            // 设置 Canvas 的实际物理像素非常小 (例如 128x96)
+            canvas.width = lowResWidth;
+            canvas.height = lowResHeight;
+            
+            isStreaming = true;
+            renderFrame();
+        });
+
+        // 3. 实时渲染循环
+        function renderFrame() {
+            if (!isStreaming) return;
+
+            // 把视频帧画到小画布上 (自动产生锯齿)
+            ctx.drawImage(video, 0, 0, lowResWidth, lowResHeight);
+
+            // 获取像素数据进行色彩处理 (Color Quantization)
+            let imageData = ctx.getImageData(0, 0, lowResWidth, lowResHeight);
+            let data = imageData.data;
+
+            // 遍历每个像素，减少颜色位深
+            // 简单的算法：将 RGB 值舍入到最近的阶梯
+            const colorDepth = 32; // 阶梯大小 (值越大，颜色越少，越复古)
+
+            for (let i = 0; i < data.length; i += 4) {
+                // R, G, B
+                data[i]     = Math.floor(data[i] / colorDepth) * colorDepth;
+                data[i + 1] = Math.floor(data[i + 1] / colorDepth) * colorDepth;
+                data[i + 2] = Math.floor(data[i + 2] / colorDepth) * colorDepth;
+                // Alpha (data[i+3]) 保持不变
+            }
+
+            // 将处理后的像素放回画布
+            ctx.putImageData(imageData, 0, 0);
+
+            animationId = requestAnimationFrame(renderFrame);
+        }
+
+        // 4. 拍照功能
+        snapBtn.addEventListener('click', () => {
+            if (isStreaming) {
+                // 暂停画面
+                isStreaming = false;
+                cancelAnimationFrame(animationId);
+                video.pause();
+                
+                // 切换按钮状态
+                snapBtn.innerText = "RESET";
+                snapBtn.style.background = "#555";
+                downloadBtn.style.display = "block";
+            } else {
+                // 重置回预览模式
+                isStreaming = true;
+                video.play();
+                renderFrame();
+                
+                snapBtn.innerText = "SHOOT";
+                snapBtn.style.background = "#cc0000";
+                downloadBtn.style.display = "none";
+            }
+        });
+
+        // 5. 保存图片
+        downloadBtn.addEventListener('click', () => {
+            // 创建一个临时的链接来下载图片
+            const link = document.createElement('a');
+            link.download = '8bit-photo-' + Date.now() + '.png';
+            
+            // 这里的 toDataURL 导出的就是那个很小的、像素化的图片
+            // 浏览器查看时可能会模糊，因为它是真的很小
+            // 为了让保存的图片也是清晰的像素风，我们可以将其绘制到一个更大的 Canvas 上再保存
+            // 但为了简单，这里直接保存原图，大多数看图软件放大看就是像素风
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        // 初始化
+        startCamera();
+
+    </script>
+</body>
+</html>
