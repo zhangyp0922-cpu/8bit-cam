@@ -3,148 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TRASH RECORDER</title>
+    <title>WARNING: COOL CAM</title>
     <style>
-        /* 保持原有的搞怪 CSS 不变 */
+        /* 强制使用“丑”字体，没有就用系统默认的粗体 */
         body {
             font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
             margin: 0;
             height: 100vh;
             overflow: hidden;
-            background: repeating-linear-gradient(45deg, #f2ff00, #f2ff00 20px, #000000 20px, #000000 40px);
+            background: repeating-linear-gradient(
+                45deg,
+                #f2ff00,
+                #f2ff00 20px,
+                #000000 20px,
+                #000000 40px
+            );
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
         }
+
+        /* 模拟一个乱七八糟的弹窗 */
         .window-frame {
             background: #ff00ff;
             border: 4px solid #000;
-            width: 90%; max-width: 400px;
+            width: 90%;
+            max-width: 400px;
             box-shadow: 15px 15px 0 rgba(0,0,0,0.8);
-            transform: rotate(-2deg);
+            transform: rotate(-2deg); /* 整个界面稍微歪一点 */
             position: relative;
             padding-bottom: 20px;
         }
+
+        /* 顶部标题栏 */
         .title-bar {
-            background: #000; color: #fff; padding: 5px; font-weight: bold; display: flex; justify-content: space-between; text-transform: uppercase; font-size: 14px;
+            background: #000;
+            color: #fff;
+            padding: 5px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            text-transform: uppercase;
+            font-size: 14px;
         }
+        .close-btn { cursor: pointer; color: #ff0000; }
+
+        /* 滚动字幕区域 */
         .marquee-container {
-            background: #fff; border-bottom: 4px solid #000; color: #0000ff; font-weight: bold; padding: 2px 0; font-size: 12px;
+            background: #fff;
+            border-bottom: 4px solid #000;
+            color: #0000ff;
+            font-weight: bold;
+            padding: 2px 0;
+            font-size: 12px;
         }
-        .viewport-wrapper { padding: 15px; position: relative; }
+
+        .viewport-wrapper {
+            padding: 15px;
+            position: relative;
+        }
+
+        /* 取景框 */
         .viewport {
-            width: 100%; aspect-ratio: 3/4; background: #000; border: 4px solid #000; position: relative; animation: shake 5s infinite;
+            width: 100%;
+            aspect-ratio: 3/4;
+            background: #000;
+            border: 4px solid #000;
+            position: relative;
+            /* 给边框加个抖动动画 */
+            animation: shake 5s infinite;
         }
-        canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
-        .sticker { position: absolute; pointer-events: none; z-index: 10; filter: drop-shadow(3px 3px 0 #000); }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            display: block;
+        }
+
+        /* 搞怪装饰贴纸 */
+        .sticker {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+            filter: drop-shadow(3px 3px 0 #000);
+        }
         .s-tape { top: -10px; left: 30%; background: #ddd; width: 40%; height: 20px; transform: rotate(2deg); opacity: 0.8; }
         .s-eye { bottom: -15px; right: -10px; font-size: 40px; transform: rotate(-20deg); }
-        /* 把 WOW 贴纸改成 REC 指示灯 */
-        .s-rec { top: 10px; left: -15px; background: red; color: white; padding: 2px 5px; font-weight: bold; border: 2px solid black; transform: rotate(-15deg); display: none; }
-        /* 录制时闪烁动画 */
-        .blinking { animation: blink 1s infinite; }
-        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
+        .s-wow { top: 10px; left: -15px; background: yellow; color: red; padding: 2px 5px; font-weight: bold; border: 2px solid black; transform: rotate(-15deg); }
 
-        .controls { display: flex; justify-content: center; gap: 15px; margin-top: 5px; }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        /* 不规则的按钮 */
         button {
-            border: 3px solid #000; font-family: inherit; font-weight: 900; font-size: 18px; cursor: pointer; box-shadow: 5px 5px 0 #000; transition: transform 0.1s;
+            border: 3px solid #000;
+            font-family: inherit;
+            font-weight: 900;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 5px 5px 0 #000;
+            transition: transform 0.1s;
         }
-        button:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #000; }
+        
+        button:active {
+            transform: translate(3px, 3px);
+            box-shadow: 2px 2px 0 #000;
+        }
 
-        /* 修改主按钮样式为录制风格 */
-        #recordBtn {
-            background: #00ff00; color: #000; padding: 15px 30px; transform: rotate(2deg); border-radius: 50% 20% 50% 20%;
+        #snapBtn {
+            background: #00ff00;
+            color: #000;
+            padding: 15px 20px;
+            transform: rotate(2deg);
+            border-radius: 50% 20% 50% 20%; /* 奇怪的形状 */
         }
-        /* 录制中按钮变红 */
-        #recordBtn.recording {
-            background: #ff0000; color: #fff; animation: shake-hard 0.5s infinite;
+
+        #saveBtn {
+            background: #00ffff;
+            color: #000;
+            padding: 15px 10px;
+            transform: rotate(-3deg);
         }
 
         @keyframes shake {
-            0% { transform: translate(0, 0); } 2% { transform: translate(2px, 2px); } 4% { transform: translate(-2px, 0); } 6% { transform: translate(0, 0); } 100% { transform: translate(0, 0); }
+            0% { transform: translate(0, 0); }
+            2% { transform: translate(2px, 2px); }
+            4% { transform: translate(-2px, 0); }
+            6% { transform: translate(0, 0); }
+            100% { transform: translate(0, 0); }
         }
-        @keyframes shake-hard {
-             0% { transform: translate(0, 0) rotate(2deg); } 25% { transform: translate(3px, 3px) rotate(1deg); } 50% { transform: translate(-3px, 0) rotate(3deg); } 75% { transform: translate(2px, -2px) rotate(2deg); } 100% { transform: translate(0, 0) rotate(2deg); }
-        }
+
     </style>
 </head>
 <body>
 
     <div class="window-frame">
         <div class="title-bar">
-            <span>V.H.S. TRASH CAM v0.99b</span>
-            <span>[X]</span>
+            <span>ERROR_404: REALITY_NOT_FOUND</span>
+            <span class="close-btn">[X]</span>
         </div>
         
         <div class="marquee-container">
-            <marquee scrollamount="10">🔴 RECORDING MODE ACTIVATED // DO NOT PIRATE TAPES // 录像模式已启动 // KEEP IT LO-FI // 保持低保真 //</marquee>
+            <marquee scrollamount="10">WARNING: HIGH VOLTAGE // DO NOT FEED THE PIXELS // 警告：内有恶犬 // 100% NO AI // WOW SO COOL //</marquee>
         </div>
 
         <div class="viewport-wrapper">
             <div class="sticker s-tape"></div>
-            <div id="recIndicator" class="sticker s-rec blinking">● REC</div>
+            <div class="sticker s-wow">HOT!</div>
             <div class="viewport">
                 <canvas id="displayCanvas"></canvas>
-                <div class="sticker s-eye">📹</div>
+                <div class="sticker s-eye">👀</div>
             </div>
         </div>
 
         <div class="controls">
-            <button id="recordBtn">START REC</button>
+            <button id="snapBtn">BOOM!</button>
+            <button id="saveBtn" style="display:none;">STEAL IT</button>
         </div>
     </div>
 
-    <video id="rawVideo" autoplay playsinline muted style="display:none;"></video>
+    <video id="rawVideo" autoplay playsinline style="display:none;"></video>
 
     <script>
+        // 核心 JS 逻辑保持不变，因为这是你喜欢的滤镜效果
         const video = document.getElementById('rawVideo');
         const canvas = document.getElementById('displayCanvas');
         const ctx = canvas.getContext('2d');
-        const recordBtn = document.getElementById('recordBtn');
-        const recIndicator = document.getElementById('recIndicator');
+        const snapBtn = document.getElementById('snapBtn');
+        const saveBtn = document.getElementById('saveBtn');
 
-        // 保持低分辨率以确保滤镜处理流畅
         const w = 120; 
         const h = 160; 
         canvas.width = w;
         canvas.height = h;
 
-        // 滤镜参数不变
-        const edgeThreshold = 35;
-        const popPalette = [[255, 255, 0], [255, 0, 255], [0, 255, 255], [50, 50, 50], [255, 255, 255]];
+        const edgeThreshold = 35; // 稍微调低一点让描边更多，更脏
+
+        // 波普色盘
+        const popPalette = [
+            [255, 255, 0],   // 纯黄
+            [255, 0, 255],   // 纯洋红
+            [0, 255, 255],   // 纯青
+            [50, 50, 50],    // 深灰
+            [255, 255, 255]  // 白
+        ];
 
         let isStreaming = false;
         let animationId;
-        
-        // 录像相关变量
-        let mediaRecorder;
-        let recordedChunks = [];
-        let isRecording = false;
 
-        function getBrightness(r, g, b) { return 0.299 * r + 0.587 * g + 0.114 * b; }
-        function colorDistSq(c1, c2) { return (c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2; }
+        function getBrightness(r, g, b) {
+            return 0.299 * r + 0.587 * g + 0.114 * b;
+        }
+        function colorDistSq(c1, c2) {
+            return (c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2;
+        }
 
         async function startCamera() {
             try {
-                // 重要修改：同时请求音频和视频
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "environment", width: 640, height: 480 },
-                    audio: true // 请求麦克风权限
+                    audio: false
                 });
                 video.srcObject = stream;
-                // video.muted = true; // HTML中已经设置，双重保险
-                
-                video.onloadedmetadata = () => {
-                    isStreaming = true;
-                    renderFrame();
-                };
-            } catch (err) {
-                alert("需要麦克风和摄像头权限！请使用 HTTPS。Error: " + err.name);
-            }
+                video.play();
+            } catch (err) { alert("Camera broken? Try HTTPS."); }
         }
 
-        // 核心渲染循环 (保持不变)
+        video.addEventListener('loadedmetadata', () => {
+            isStreaming = true;
+            renderFrame();
+        });
+
         function renderFrame() {
             if (!isStreaming) return;
             ctx.drawImage(video, 0, 0, w, h);
@@ -155,19 +230,24 @@
             for (let y = 1; y < h - 1; y++) {
                 for (let x = 1; x < w - 1; x++) {
                     let idx = (y * w + x) * 4;
-                    // ... (省略掉与之前完全相同的 Sobel 边缘检测和色彩量化代码以节省篇幅) ...
-                    let idxL = (y * w + (x - 1)) * 4; let idxR = (y * w + (x + 1)) * 4;
-                    let idxT = ((y - 1) * w + x) * 4; let idxB = ((y + 1) * w + x) * 4;
+                    let idxL = (y * w + (x - 1)) * 4;
+                    let idxR = (y * w + (x + 1)) * 4;
+                    let idxT = ((y - 1) * w + x) * 4;
+                    let idxB = ((y + 1) * w + x) * 4;
+
                     let briL = getBrightness(srcData[idxL], srcData[idxL+1], srcData[idxL+2]);
                     let briR = getBrightness(srcData[idxR], srcData[idxR+1], srcData[idxR+2]);
                     let briT = getBrightness(srcData[idxT], srcData[idxT+1], srcData[idxT+2]);
                     let briB = getBrightness(srcData[idxB], srcData[idxB+1], srcData[idxB+2]);
+
                     let edgeStrength = Math.abs(briL - briR) + Math.abs(briT - briB);
+
                     if (edgeStrength > edgeThreshold) {
                         dstData[idx] = 0; dstData[idx+1] = 0; dstData[idx+2] = 0; dstData[idx+3] = 255;
                     } else {
                         let curR = srcData[idx], curG = srcData[idx+1], curB = srcData[idx+2];
-                        let closest = popPalette[0]; let minD = Infinity;
+                        let closest = popPalette[0];
+                        let minD = Infinity;
                         for (let col of popPalette) {
                             let d = colorDistSq([curR, curG, curB], col);
                             if (d < minD) { minD = d; closest = col; }
@@ -180,98 +260,37 @@
             animationId = requestAnimationFrame(renderFrame);
         }
 
-        // --- 录像控制逻辑 ---
-
-        function startRecording() {
-            recordedChunks = [];
-            // 1. 捕捉 Canvas 的画面流 (设置 fps 为 30)
-            const canvasStream = canvas.captureStream(30);
-            
-            // 2. 获取原始视频流中的音频轨道 (如果有)
-            if (video.srcObject && video.srcObject.getAudioTracks().length > 0) {
-                const audioTrack = video.srcObject.getAudioTracks()[0];
-                // 将音频轨道添加到 canvas 流中
-                canvasStream.addTrack(audioTrack);
-            }
-
-            // 3. 初始化 MediaRecorder
-            // 尝试使用兼容性较好的 WebM 格式
-            let options = { mimeType: 'video/webm;codecs=vp9' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                 options = { mimeType: 'video/webm' }; // 回退方案
-            }
-            
-            try {
-                mediaRecorder = new MediaRecorder(canvasStream, options);
-            } catch (e) {
-                alert('MediaRecorder 初始化失败，你的浏览器可能不支持。');
-                return;
-            }
-
-            // 4. 数据收集事件
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    recordedChunks.push(event.data);
-                }
-            };
-
-            // 5. 停止录制事件 (处理保存)
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'TRASH-TAPE-' + Date.now() + '.webm';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    alert("TAPE SAVED! \n录像带已保存！");
-                }, 100);
-            };
-
-            // 6. 开始录制
-            mediaRecorder.start();
-            isRecording = true;
-            updateUIState(true);
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-            isRecording = false;
-            updateUIState(false);
-        }
-
-        // 更新 UI 状态
-        function updateUIState(recording) {
-            if (recording) {
-                recordBtn.innerText = "STOP REC ■";
-                recordBtn.classList.add('recording'); // 添加红色震动效果
-                recIndicator.style.display = "block"; // 显示左上角 REC 指示灯
+        snapBtn.addEventListener('click', () => {
+            if (isStreaming) {
+                isStreaming = false;
+                cancelAnimationFrame(animationId);
+                video.pause();
+                // 搞怪文案
+                snapBtn.innerText = "NO NO NO";
+                snapBtn.style.background = "#ff0000";
+                snapBtn.style.color = "#fff";
+                saveBtn.style.display = "block";
             } else {
-                recordBtn.innerText = "START REC ▶";
-                recordBtn.classList.remove('recording');
-                recIndicator.style.display = "none";
-            }
-        }
-
-        // 按钮点击事件
-        recordBtn.addEventListener('click', () => {
-            if (!isStreaming) return;
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
+                isStreaming = true;
+                video.play();
+                renderFrame();
+                snapBtn.innerText = "BOOM!";
+                snapBtn.style.background = "#00ff00";
+                snapBtn.style.color = "#000";
+                saveBtn.style.display = "none";
             }
         });
 
-        // 启动！
-        startCamera();
+        saveBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'TRASH-CAM-' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            // 保存后给个反馈
+            alert("SAVED TO DISK!!!\n已保存！！！");
+        });
 
+        startCamera();
     </script>
 </body>
 </html>
