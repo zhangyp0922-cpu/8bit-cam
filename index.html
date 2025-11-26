@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Riso-Cam 3:4</title>
+    <title>Riso-Block Cam</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
 
         body {
-            background-color: #111;
-            color: #fff;
+            background-color: #000;
+            color: #eee;
             font-family: 'Space Mono', monospace;
             margin: 0;
             display: flex;
@@ -20,114 +20,88 @@
             overflow: hidden;
         }
 
-        /* 相机外壳：极简工业风 */
-        .camera-body {
-            background: #222;
+        .camera-container {
             width: 90%;
-            max-width: 420px;
-            /* 适配内容高度 */
-            padding: 20px; 
-            border-radius: 2px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            border: 1px solid #333;
+            max-width: 400px;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            gap: 15px;
         }
 
-        /* 3:4 画幅容器 */
-        .viewport-container {
+        /* 3:4 比例的取景框 */
+        .viewport-box {
             width: 100%;
-            /* 宽高比 3:4 = 0.75 */
             aspect-ratio: 3/4;
-            background: #000;
+            background: #111;
+            border: 3px solid #eee;
             position: relative;
-            border: 2px solid #fff;
-            margin-bottom: 20px;
             overflow: hidden;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
         }
 
         canvas {
             width: 100%;
             height: 100%;
-            /* 关键：保持像素颗粒清晰 */
+            /* 关键：保持像素化，不模糊 */
             image-rendering: pixelated;
+            /* 稍微增加一点对比度，让色块更硬 */
+            filter: contrast(1.1);
         }
 
-        /* 颗粒噪点叠加层（增强质感） */
-        .noise-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMDAlJyBoZWlnaHQ9JzIwMCUnPjxmaWx0ZXIgaWQ9J24nPjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjc1JyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndHJhbnNwYXJlbnQnLz48cmVjdCB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyBmaWx0ZXI9J3VybCgjbiknIG9wYWNpdHk9JzAuMTUnLz48L3N2Zz4=');
-            opacity: 0.3;
-            pointer-events: none;
-            mix-blend-mode: overlay;
-        }
-
+        /* UI 控件 */
         .controls {
             display: flex;
             justify-content: space-between;
-            width: 100%;
             align-items: center;
+            padding: 10px 0;
         }
 
-        button {
-            background: transparent;
-            border: 2px solid #fff;
-            color: #fff;
-            font-family: 'Space Mono', monospace;
+        .btn {
+            background: #333;
+            border: 2px solid #eee;
+            color: #eee;
+            padding: 15px 25px;
+            font-family: inherit;
+            font-weight: bold;
             font-size: 14px;
-            padding: 12px 24px;
             cursor: pointer;
             text-transform: uppercase;
-            font-weight: bold;
-            transition: all 0.1s;
+            box-shadow: 3px 3px 0 #555;
+            transition: transform 0.1s;
         }
-
-        button:active {
-            background: #fff;
-            color: #000;
+        .btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 #555;
         }
 
         #snapBtn {
-            background: #f00; /* 红色快门 */
-            border-color: #f00;
-            color: #000;
+            background: #d92446; /* 复古红 */
+            border-color: #d92446;
+            color: #fff;
         }
-        #snapBtn:active {
-            background: #fff;
-            border-color: #fff;
+        
+        .label {
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.7;
+            letter-spacing: 1px;
         }
-
-        .meta-info {
-            font-size: 10px;
-            color: #666;
-            margin-top: 10px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-        }
-
     </style>
 </head>
 <body>
 
-    <div class="camera-body">
-        <div class="viewport-container">
+    <div class="camera-container">
+        <div class="label">RISO-BLOCK GRAIN LENS</div>
+        <div class="viewport-box">
             <canvas id="displayCanvas"></canvas>
-            <div class="noise-overlay"></div>
         </div>
 
         <div class="controls">
-            <button id="switchBtn" style="font-size:12px;">CAM ↻</button>
-            <button id="snapBtn">SHOOT</button>
-            <button id="saveBtn" style="display:none;">SAVE</button>
+             <button class="btn" style="opacity:0; pointer-events:none;">X</button>
+            <button id="snapBtn" class="btn">SHOOT</button>
+            <button id="saveBtn" class="btn" style="display:none;">SAVE</button>
         </div>
-        
-        <div class="meta-info">
-            <span>RISO-GRAIN v2.0</span>
-            <span>RATIO 3:4</span>
-        </div>
+        <div class="label">RATIO 3:4</div>
     </div>
 
     <video id="rawVideo" autoplay playsinline style="display:none;"></video>
@@ -138,47 +112,42 @@
         const ctx = canvas.getContext('2d');
         const snapBtn = document.getElementById('snapBtn');
         const saveBtn = document.getElementById('saveBtn');
-        const switchBtn = document.getElementById('switchBtn');
 
-        // --- 设置 ---
-        // 宽度设为 160，高度按 3:4 计算即 213 (160 * 1.333)
-        // 这个分辨率比 GameBoy 高，能保留更多细节，但又有足够的像素颗粒感
-        const renderWidth = 160; 
-        const renderHeight = 213; 
+        // --- 分辨率设置 ---
+        // 稍微降低分辨率，让“色块”更大，计算也更快
+        // 宽度 120，高度 160 (符合 3:4)
+        const renderWidth = 120; 
+        const renderHeight = 160; 
+
+        // --- 核心：自定义复古色盘 ---
+        // 参考了你提供的图片风格，定义了一组有限的颜色
+        // 格式: [R, G, B]
+        const retroPalette = [
+            [20, 20, 30],    // 深黑紫 (暗部)
+            [40, 80, 60],    // 复古深绿
+            [180, 40, 80],   // 玫红/深红
+            [220, 180, 50],  // 暗黄/姜黄
+            [80, 140, 130],  // 青灰
+            [230, 230, 210]  // 米白/高光
+        ];
         
+        // --- 噪点强度 ---
+        // 值越大，颗粒感越强，色块边缘越破碎
+        const noiseIntensity = 70; 
+
         let isStreaming = false;
         let animationId;
-        let currentFacingMode = "environment"; // 默认后置
-
-        // 拜耳矩阵 (Bayer Matrix) 4x4
-        // 用来决定像素是否“点亮”，制造噪点渐变效果
-        // 数值范围 0-64
-        const bayerMatrix = [
-            [ 0, 32,  8, 40],
-            [48, 16, 56, 24],
-            [12, 44,  4, 36],
-            [60, 28, 52, 20]
-        ];
 
         async function startCamera() {
-            if (isStreaming) {
-                video.pause();
-                isStreaming = false;
-            }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: currentFacingMode,
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
+                    video: { facingMode: "environment", width: 640, height: 480 },
                     audio: false
                 });
                 video.srcObject = stream;
                 video.play();
             } catch (err) {
-                console.error("Camera Error:", err);
-                alert("无法启动摄像头。请确保使用 HTTPS 访问。");
+                alert("摄像头启动失败，请检查权限或使用 HTTPS。");
             }
         }
 
@@ -189,110 +158,91 @@
             renderFrame();
         });
 
+        // 计算两个颜色之间的距离平方 (用于寻找最近颜色)
+        function colorDistanceSq(r1, g1, b1, r2, g2, b2) {
+            return (r1 - r2)**2 + (g1 - g2)**2 + (b1 - b2)**2;
+        }
+
         function renderFrame() {
             if (!isStreaming) return;
 
-            // 1. 裁剪绘制：实现 cover 效果 (填满 3:4 比例，不拉伸)
+            // 1. 居中裁剪绘制 (保持 3:4 比例)
             const vidW = video.videoWidth;
             const vidH = video.videoHeight;
-            const targetRatio = renderWidth / renderHeight; // 0.75
+            const targetRatio = renderWidth / renderHeight;
             const vidRatio = vidW / vidH;
-
             let sx, sy, sWidth, sHeight;
-
             if (vidRatio > targetRatio) {
-                // 视频比画布宽，裁剪两边
-                sHeight = vidH;
-                sWidth = sHeight * targetRatio;
-                sy = 0;
-                sx = (vidW - sWidth) / 2;
+                sHeight = vidH; sWidth = sHeight * targetRatio;
+                sy = 0; sx = (vidW - sWidth) / 2;
             } else {
-                // 视频比画布高，裁剪上下
-                sWidth = vidW;
-                sHeight = sWidth / targetRatio;
-                sx = 0;
-                sy = (vidH - sHeight) / 2;
+                sWidth = vidW; sHeight = sWidth / targetRatio;
+                sx = 0; sy = (vidH - sHeight) / 2;
             }
-
-            // 将视频帧绘制到小画布上
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, renderWidth, renderHeight);
 
             // 2. 获取像素数据
             let imageData = ctx.getImageData(0, 0, renderWidth, renderHeight);
             let data = imageData.data;
 
-            // 3. 算法核心：RGB 抖动 (Ordered Dithering)
-            for (let y = 0; y < renderHeight; y++) {
-                for (let x = 0; x < renderWidth; x++) {
-                    const i = (y * renderWidth + x) * 4;
+            // 3. 核心算法循环
+            for (let i = 0; i < data.length; i += 4) {
+                // 获取原始像素并添加随机噪点
+                // Math.random() - 0.5 生成 -0.5 到 0.5 的数
+                let r = data[i] + (Math.random() - 0.5) * noiseIntensity;
+                let g = data[i + 1] + (Math.random() - 0.5) * noiseIntensity;
+                let b = data[i + 2] + (Math.random() - 0.5) * noiseIntensity;
 
-                    // 获取当前像素在拜耳矩阵中的阈值 (0-64)
-                    // 乘以 4 将其扩展到 0-256 范围，作为对比基准
-                    let mapValue = bayerMatrix[y % 4][x % 4] * 4;
+                // 寻找色盘中最接近的颜色
+                let closestColor = retroPalette[0];
+                let minDistance = Infinity;
 
-                    // 稍微提高对比度：让亮部更亮，暗部更暗
-                    // 也可以调整这里的数值来改变“曝光度”
-                    const contrast = 1.2; 
+                for (let j = 0; j < retroPalette.length; j++) {
+                    let paletteColor = retroPalette[j];
+                    let dist = colorDistanceSq(r, g, b, paletteColor[0], paletteColor[1], paletteColor[2]);
                     
-                    let r = data[i];
-                    let g = data[i + 1];
-                    let b = data[i + 2];
-
-                    // 核心逻辑：
-                    // 如果 (当前颜色值 + 矩阵阈值) > 255，则该像素通道设为高亮，否则设为暗。
-                    // 这种处理会让中间色调变成“红点”和“黑点”的混合，产生那种复古印刷质感。
-                    
-                    // 这里我们做 "2-bit" 量化 (每个通道只有几个阶梯)，增加色彩丰富度但保持噪点
-                    // 阶梯数：值越小，色块越明显；值越大，越细腻。
-                    const steps = 2; // 尝试改为 1 就会变成纯粹的 8 色 (红黄蓝绿青品黑白)
-                    const stepSize = 255 / steps; // 127.5
-
-                    data[i]     = Math.floor((r * contrast + mapValue) / stepSize) * stepSize;
-                    data[i + 1] = Math.floor((g * contrast + mapValue) / stepSize) * stepSize;
-                    data[i + 2] = Math.floor((b * contrast + mapValue) / stepSize) * stepSize;
-                    
-                    // 简单的噪点增强 (模拟 ISO 颗粒)
-                    // data[i] += (Math.random() - 0.5) * 10;
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestColor = paletteColor;
+                    }
                 }
+
+                // 将像素替换为最接近的色盘颜色
+                data[i] = closestColor[0];
+                data[i + 1] = closestColor[1];
+                data[i + 2] = closestColor[2];
             }
 
+            // 4. 放回处理后的数据
             ctx.putImageData(imageData, 0, 0);
             animationId = requestAnimationFrame(renderFrame);
         }
 
-        // 拍照
+        // 拍照交互
         snapBtn.addEventListener('click', () => {
             if (isStreaming) {
                 isStreaming = false;
                 cancelAnimationFrame(animationId);
                 video.pause();
                 snapBtn.innerText = "RESET";
-                snapBtn.style.background = "#fff";
+                snapBtn.style.background = "#333";
                 saveBtn.style.display = "block";
-                switchBtn.style.display = "none";
             } else {
                 isStreaming = true;
                 video.play();
                 renderFrame();
                 snapBtn.innerText = "SHOOT";
-                snapBtn.style.background = "#f00";
+                snapBtn.style.background = "#d92446";
                 saveBtn.style.display = "none";
-                switchBtn.style.display = "block";
             }
         });
 
         // 保存
         saveBtn.addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = 'RISO-Photo-' + Date.now() + '.png';
+            link.download = 'RISO-BLOCK-' + Date.now() + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
-        });
-
-        // 切换前后摄
-        switchBtn.addEventListener('click', () => {
-            currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-            startCamera();
         });
 
         startCamera();
