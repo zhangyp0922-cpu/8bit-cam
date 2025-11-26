@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Riso-Block Cam</title>
+    <title>POP-ART CAM</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+        /* 引入一种粗犷的复古字体 */
+        @import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&display=swap');
 
         body {
-            background-color: #000;
-            color: #eee;
-            font-family: 'Space Mono', monospace;
+            background-color: #FFD700; /* 波普黄背景 */
+            color: #000;
+            font-family: 'Rubik Mono One', sans-serif;
             margin: 0;
             display: flex;
             flex-direction: column;
@@ -18,90 +19,81 @@
             justify-content: center;
             height: 100vh;
             overflow: hidden;
+            text-transform: uppercase;
         }
 
-        .camera-container {
+        .container {
             width: 90%;
             max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+            border: 8px solid #000;
+            background: #fff;
+            padding: 10px;
+            box-shadow: 15px 15px 0px #000; /* 硬朗的阴影 */
         }
 
-        /* 3:4 比例的取景框 */
-        .viewport-box {
+        .header-text {
+            text-align: center;
+            font-size: 20px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0 #FF00FF; /* 颜色错位效果 */
+        }
+
+        .viewport {
             width: 100%;
             aspect-ratio: 3/4;
-            background: #111;
-            border: 3px solid #eee;
+            background: #000;
+            border: 4px solid #000;
             position: relative;
-            overflow: hidden;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
         }
 
         canvas {
             width: 100%;
             height: 100%;
-            /* 关键：保持像素化，不模糊 */
+            /* 保持像素清晰，不要模糊 */
             image-rendering: pixelated;
-            /* 稍微增加一点对比度，让色块更硬 */
-            filter: contrast(1.1);
         }
 
-        /* UI 控件 */
         .controls {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 20px;
         }
 
-        .btn {
-            background: #333;
-            border: 2px solid #eee;
-            color: #eee;
-            padding: 15px 25px;
-            font-family: inherit;
-            font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-            text-transform: uppercase;
-            box-shadow: 3px 3px 0 #555;
-            transition: transform 0.1s;
-        }
-        .btn:active {
-            transform: translate(2px, 2px);
-            box-shadow: 1px 1px 0 #555;
-        }
-
-        #snapBtn {
-            background: #d92446; /* 复古红 */
-            border-color: #d92446;
+        button {
+            background: #FF00FF; /* 玫红 */
+            border: 4px solid #000;
             color: #fff;
+            font-family: inherit;
+            font-size: 16px;
+            padding: 15px 30px;
+            cursor: pointer;
+            box-shadow: 6px 6px 0px #000;
         }
-        
-        .label {
-            text-align: center;
-            font-size: 12px;
-            opacity: 0.7;
-            letter-spacing: 1px;
+        button:active {
+            transform: translate(4px, 4px);
+            box-shadow: 2px 2px 0px #000;
+            background: #00FFFF; /* 点击变青色 */
+            color: #000;
+        }
+
+        #saveBtn {
+            background: #00FFFF;
+            color: #000;
         }
     </style>
 </head>
 <body>
 
-    <div class="camera-container">
-        <div class="label">RISO-BLOCK GRAIN LENS</div>
-        <div class="viewport-box">
+    <div class="container">
+        <div class="header-text">POP-ART COMIC LENS</div>
+        <div class="viewport">
             <canvas id="displayCanvas"></canvas>
         </div>
-
         <div class="controls">
-             <button class="btn" style="opacity:0; pointer-events:none;">X</button>
-            <button id="snapBtn" class="btn">SHOOT</button>
-            <button id="saveBtn" class="btn" style="display:none;">SAVE</button>
+            <button id="snapBtn">SHOOT</button>
+            <button id="saveBtn" style="display:none;">SAVE</button>
         </div>
-        <div class="label">RATIO 3:4</div>
     </div>
 
     <video id="rawVideo" autoplay playsinline style="display:none;"></video>
@@ -113,30 +105,36 @@
         const snapBtn = document.getElementById('snapBtn');
         const saveBtn = document.getElementById('saveBtn');
 
-        // --- 分辨率设置 ---
-        // 稍微降低分辨率，让“色块”更大，计算也更快
-        // 宽度 120，高度 160 (符合 3:4)
-        const renderWidth = 120; 
-        const renderHeight = 160; 
+        // --- 设置 ---
+        const w = 120; // 处理分辨率宽
+        const h = 160; // 处理分辨率高 (3:4)
+        canvas.width = w;
+        canvas.height = h;
 
-        // --- 核心：自定义复古色盘 ---
-        // 参考了你提供的图片风格，定义了一组有限的颜色
-        // 格式: [R, G, B]
-        const retroPalette = [
-            [20, 20, 30],    // 深黑紫 (暗部)
-            [40, 80, 60],    // 复古深绿
-            [180, 40, 80],   // 玫红/深红
-            [220, 180, 50],  // 暗黄/姜黄
-            [80, 140, 130],  // 青灰
-            [230, 230, 210]  // 米白/高光
+        // 边缘检测阈值：越小描边越多越杂，越大描边越少越干净
+        const edgeThreshold = 40; 
+
+        // --- 波普艺术色盘 (参考原图风格) ---
+        // 格式 [R, G, B]
+        const popPalette = [
+            [255, 220, 0],   // 亮黄
+            [160, 30, 120],  // 深紫红
+            [0, 150, 130],   // 青绿
+            [20, 20, 20],    // 近乎黑
+            [240, 240, 240]  // 近乎白
         ];
-        
-        // --- 噪点强度 ---
-        // 值越大，颗粒感越强，色块边缘越破碎
-        const noiseIntensity = 70; 
 
         let isStreaming = false;
         let animationId;
+
+        // 计算亮度
+        function getBrightness(r, g, b) {
+            return 0.299 * r + 0.587 * g + 0.114 * b;
+        }
+        // 计算颜色距离
+        function colorDistSq(c1, c2) {
+            return (c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2;
+        }
 
         async function startCamera() {
             try {
@@ -146,101 +144,105 @@
                 });
                 video.srcObject = stream;
                 video.play();
-            } catch (err) {
-                alert("摄像头启动失败，请检查权限或使用 HTTPS。");
-            }
+            } catch (err) { alert("需HTTPS或localhost访问"); }
         }
 
         video.addEventListener('loadedmetadata', () => {
-            canvas.width = renderWidth;
-            canvas.height = renderHeight;
             isStreaming = true;
             renderFrame();
         });
 
-        // 计算两个颜色之间的距离平方 (用于寻找最近颜色)
-        function colorDistanceSq(r1, g1, b1, r2, g2, b2) {
-            return (r1 - r2)**2 + (g1 - g2)**2 + (b1 - b2)**2;
-        }
-
         function renderFrame() {
             if (!isStreaming) return;
 
-            // 1. 居中裁剪绘制 (保持 3:4 比例)
-            const vidW = video.videoWidth;
-            const vidH = video.videoHeight;
-            const targetRatio = renderWidth / renderHeight;
-            const vidRatio = vidW / vidH;
-            let sx, sy, sWidth, sHeight;
-            if (vidRatio > targetRatio) {
-                sHeight = vidH; sWidth = sHeight * targetRatio;
-                sy = 0; sx = (vidW - sWidth) / 2;
-            } else {
-                sWidth = vidW; sHeight = sWidth / targetRatio;
-                sx = 0; sy = (vidH - sHeight) / 2;
-            }
-            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, renderWidth, renderHeight);
+            // 1. 绘制原始小图
+            // 简单拉伸绘制，计算边缘需要像素对其
+            ctx.drawImage(video, 0, 0, w, h);
 
-            // 2. 获取像素数据
-            let imageData = ctx.getImageData(0, 0, renderWidth, renderHeight);
-            let data = imageData.data;
+            // 2. 获取原始像素数据 (只读)
+            let srcData = ctx.getImageData(0, 0, w, h).data;
+            // 3. 创建新的输出像素数据 (写入)
+            let outputImgData = ctx.createImageData(w, h);
+            let dstData = outputImgData.data;
 
-            // 3. 核心算法循环
-            for (let i = 0; i < data.length; i += 4) {
-                // 获取原始像素并添加随机噪点
-                // Math.random() - 0.5 生成 -0.5 到 0.5 的数
-                let r = data[i] + (Math.random() - 0.5) * noiseIntensity;
-                let g = data[i + 1] + (Math.random() - 0.5) * noiseIntensity;
-                let b = data[i + 2] + (Math.random() - 0.5) * noiseIntensity;
+            // --- 核心循环：边缘检测 + 色彩概括 ---
+            // 我们跳过最外一圈像素，因为它们没有完整的邻居
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    let idx = (y * w + x) * 4;
 
-                // 寻找色盘中最接近的颜色
-                let closestColor = retroPalette[0];
-                let minDistance = Infinity;
+                    // A. --- 边缘检测 (简易 Sobel) ---
+                    // 获取上下左右四个邻居的索引
+                    let idxL = (y * w + (x - 1)) * 4;
+                    let idxR = (y * w + (x + 1)) * 4;
+                    let idxT = ((y - 1) * w + x) * 4;
+                    let idxB = ((y + 1) * w + x) * 4;
 
-                for (let j = 0; j < retroPalette.length; j++) {
-                    let paletteColor = retroPalette[j];
-                    let dist = colorDistanceSq(r, g, b, paletteColor[0], paletteColor[1], paletteColor[2]);
-                    
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        closestColor = paletteColor;
+                    // 计算邻居亮度
+                    let briL = getBrightness(srcData[idxL], srcData[idxL+1], srcData[idxL+2]);
+                    let briR = getBrightness(srcData[idxR], srcData[idxR+1], srcData[idxR+2]);
+                    let briT = getBrightness(srcData[idxT], srcData[idxT+1], srcData[idxT+2]);
+                    let briB = getBrightness(srcData[idxB], srcData[idxB+1], srcData[idxB+2]);
+
+                    // 计算水平和垂直方向的亮度差
+                    let deltaX = Math.abs(briL - briR);
+                    let deltaY = Math.abs(briT - briB);
+                    // 总边缘强度
+                    let edgeStrength = deltaX + deltaY;
+
+                    if (edgeStrength > edgeThreshold) {
+                        // --- 是边缘，画黑色描边 ---
+                        dstData[idx] = 0;   // R
+                        dstData[idx+1] = 0; // G
+                        dstData[idx+2] = 0; // B
+                        dstData[idx+3] = 255; // Alpha
+                    } else {
+                        // --- 不是边缘，进行色彩概括 ---
+                        let curR = srcData[idx];
+                        let curG = srcData[idx+1];
+                        let curB = srcData[idx+2];
+
+                        // 寻找最近的波普色
+                        let closest = popPalette[0];
+                        let minD = Infinity;
+                        for (let col of popPalette) {
+                            let d = colorDistSq([curR, curG, curB], col);
+                            if (d < minD) { minD = d; closest = col; }
+                        }
+                        
+                        dstData[idx] = closest[0];
+                        dstData[idx+1] = closest[1];
+                        dstData[idx+2] = closest[2];
+                        dstData[idx+3] = 255;
                     }
                 }
-
-                // 将像素替换为最接近的色盘颜色
-                data[i] = closestColor[0];
-                data[i + 1] = closestColor[1];
-                data[i + 2] = closestColor[2];
             }
 
-            // 4. 放回处理后的数据
-            ctx.putImageData(imageData, 0, 0);
+            // 4. 将处理好的数据放回画布
+            ctx.putImageData(outputImgData, 0, 0);
             animationId = requestAnimationFrame(renderFrame);
         }
 
-        // 拍照交互
+        // 交互逻辑
         snapBtn.addEventListener('click', () => {
             if (isStreaming) {
                 isStreaming = false;
                 cancelAnimationFrame(animationId);
                 video.pause();
                 snapBtn.innerText = "RESET";
-                snapBtn.style.background = "#333";
                 saveBtn.style.display = "block";
             } else {
                 isStreaming = true;
                 video.play();
                 renderFrame();
                 snapBtn.innerText = "SHOOT";
-                snapBtn.style.background = "#d92446";
                 saveBtn.style.display = "none";
             }
         });
 
-        // 保存
         saveBtn.addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = 'RISO-BLOCK-' + Date.now() + '.png';
+            link.download = 'POPART-' + Date.now() + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
         });
