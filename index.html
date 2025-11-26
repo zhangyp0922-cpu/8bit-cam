@@ -1,261 +1,537 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ART-CORE RECORDER</title>
-    <style>
-        /* --- UI 风格保持不变 (Comic Sans, 搞怪背景) --- */
-        body {
-            font-family: 'Comic Sans MS', 'Marker Felt', sans-serif;
-            margin: 0; height: 100vh; overflow: hidden;
-            background: repeating-linear-gradient(45deg, #333, #333 20px, #555 20px, #555 40px); /* 改成更忧郁的深色背景 */
-            display: flex; flex-direction: column; align-items: center; justify-content: center; color: #eee;
-        }
-        .window-frame {
-            background: #a83232; /* 锈红色边框 */
-            border: 4px solid #000; width: 90%; max-width: 400px;
-            box-shadow: 15px 15px 0 rgba(0,0,0,0.8); transform: rotate(-1deg);
-            position: relative; padding-bottom: 20px;
-        }
-        .title-bar {
-            background: #000; color: #f0e68c; padding: 5px; font-weight: bold; display: flex; justify-content: space-between; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;
-        }
-        .marquee-container {
-            background: #f0e68c; border-bottom: 4px solid #000; color: #000; font-weight: bold; padding: 2px 0; font-size: 12px;
-        }
-        .viewport-wrapper { padding: 15px; position: relative; }
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Camera, Sliders, Zap, SwitchCamera, Video, Image as ImageIcon } from 'lucide-react';
+
+// --- 全局样式注入 ---
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+  .font-space-mono {
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* 模拟 80年代 杂志印刷的半色调网点效果 */
+  .halftone-overlay {
+      background-image: radial-gradient(circle, #000 1px, transparent 1.5px);
+      background-size: 6px 6px;
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      opacity: 0.4;
+      z-index: 20;
+  }
+
+  /* 模拟纸张纹理和噪点 */
+  .noise-overlay {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 21;
+  }
+
+  /* 扫描线效果 */
+  .scanlines {
+      background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0,0,0,0.1) 50%,
+          rgba(0,0,0,0.1)
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 22;
+  }
+
+  /* 极简主义的 UI 阴影 */
+  .retro-shadow {
+      box-shadow: 4px 4px 0px #000;
+  }
+  
+  .retro-shadow-sm {
+      box-shadow: 2px 2px 0px #000;
+  }
+
+  /* 按钮点击态 */
+  .active-press:active {
+      transform: translate(2px, 2px);
+      box-shadow: 0px 0px 0px #000;
+  }
+  
+  canvas, video {
+      image-rendering: pixelated; /* 保持复古像素感 */
+  }
+`;
+
+// --- SVG 滤镜定义 (用于视频流的莫比乌斯风格化) ---
+const SvgFilters = () => (
+    <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+            <filter id="mobiusColor">
+                {/* 1. 降低饱和度并增强对比度，转为灰度 */}
+                <feColorMatrix type="saturate" values="0" />
+                <feComponentTransfer>
+                    <feFuncR type="linear" slope="3" intercept="-1"/>
+                    <feFuncG type="linear" slope="3" intercept="-1"/>
+                    <feFuncB type="linear" slope="3" intercept="-1"/>
+                </feComponentTransfer>
+                
+                {/* 2. 双色调映射：暗部->紫色(#2d1b36), 亮部->黄色(#FFD700) 
+                    Matrix logic approximate:
+                    R = srcR * (TargetLightR - TargetDarkR) + TargetDarkR
+                */}
+                <feColorMatrix type="matrix" values="
+                    0.82 0 0 0 0.17 
+                    0.74 0 0 0 0.10 
+                    0.00 0 0 0 0.21 
+                    0    0 0 1 0" 
+                />
+            </filter>
+        </defs>
+    </svg>
+);
+
+// --- 虚拟场景渲染组件 (之前的 Canvas 动画) ---
+const SceneRenderer = ({ settings, triggerSave, onSaveComplete }) => {
+    const canvasRef = useRef(null);
+    const requestRef = useRef();
+    const particlesRef = useRef([]);
+    const timeRef = useRef(0);
+
+    // 初始化烟雾粒子
+    useEffect(() => {
+        particlesRef.current = Array.from({ length: 30 }, () => ({
+            x: Math.random() * 50 + 20,
+            y: Math.random() * 20,
+            vx: (Math.random() - 0.2) * 0.5,
+            vy: -(Math.random() * 0.5 + 0.2),
+            life: Math.random() * 100,
+            size: Math.random() * 15 + 5
+        }));
+    }, []);
+
+    const animate = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        timeRef.current += 0.01;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // 背景
+        const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+        bgGradient.addColorStop(0, '#4a2c5a');
+        bgGradient.addColorStop(1, '#663399');
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = '#2d1b36';
+        ctx.beginPath();
+        ctx.moveTo(0, height * 0.8);
+        ctx.lineTo(width, height * 0.7);
+        ctx.lineTo(width, height);
+        ctx.lineTo(0, height);
+        ctx.fill();
+
+        // 窗户
+        const winX = width * 0.1;
+        const winY = height * 0.15;
+        const winW = width * 0.45;
+        const winH = height * 0.5;
+
+        ctx.fillStyle = '#d63384'; 
+        ctx.fillRect(winX - 10, winY - 10, winW + 20, winH + 20);
         
-        /* 关键修改：Viewport 容器 */
-        .viewport {
-            width: 100%; aspect-ratio: 3/4; background: #000; border: 4px solid #000; position: relative;
-            /* 整体柔焦效果 */
-            filter: blur(0.5px) contrast(1.1) saturate(1.2);
-            overflow: hidden;
+        const winGradient = ctx.createLinearGradient(winX, winY, winX, winY + winH);
+        winGradient.addColorStop(0, '#20c997');
+        winGradient.addColorStop(1, '#0dcaf0');
+        ctx.fillStyle = winGradient;
+        ctx.fillRect(winX, winY, winW, winH);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        const blindCount = 12;
+        const blindHeight = winH / blindCount;
+        for(let i=0; i<blindCount; i++) {
+            ctx.fillRect(winX, winY + i * blindHeight + 5, winW, blindHeight * 0.6);
         }
 
-        canvas { 
-            width: 100%; height: 100%; display: block;
-            /* 稍微放大一点画布，制造边缘不整齐的感觉 */
-            transform: scale(1.02);
-        }
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.arc(winX + winW*0.3, winY + winH*0.4, 30, 0, Math.PI*2);
+        ctx.fill();
 
-        /* 贴纸装饰 */
-        .sticker { position: absolute; pointer-events: none; z-index: 20; filter: drop-shadow(3px 3px 0 #000); }
-        .s-tape { top: -10px; left: 30%; background: #d0c0a0; width: 40%; height: 20px; transform: rotate(2deg); opacity: 0.9; }
-        .s-rec { top: 10px; left: -15px; background: #ff0000; color: white; padding: 4px 8px; font-weight: bold; border: 2px solid black; transform: rotate(-15deg); display: none; font-size: 14px; }
-        .blinking { animation: blink 0.8s steps(1) infinite; }
-        @keyframes blink { 50% {opacity: 0;} }
+        // 男人剪影
+        ctx.save();
+        ctx.translate(width * 0.65, height * 0.35);
+        const scale = height * 0.0018;
+        ctx.scale(scale, scale);
 
-        .controls { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
-        button {
-            border: 3px solid #000; font-family: inherit; font-weight: 900; font-size: 18px; cursor: pointer; box-shadow: 6px 6px 0 #000; transition: transform 0.1s; text-transform: uppercase;
-        }
-        button:active { transform: translate(4px, 4px); box-shadow: 2px 2px 0 #000; }
-        #recordBtn {
-            background: #f0e68c; color: #000; padding: 15px 25px; transform: rotate(1deg); border-radius: 4px;
-        }
-        #recordBtn.recording {
-            background: #ff4444; color: #fff;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="window-frame">
-        <div class="title-bar">
-            <span>SILKSCREEN_ILLUSTRATOR.exe</span>
-            <span>[_]</span>
-        </div>
+        const manPath = new Path2D();
+        manPath.moveTo(0, 0);
+        manPath.bezierCurveTo(30, 0, 50, 20, 50, 60);
+        manPath.lineTo(50, 150);
+        manPath.bezierCurveTo(70, 180, 120, 200, 150, 300);
+        manPath.lineTo(-50, 300);
+        manPath.lineTo(-40, 160);
+        manPath.lineTo(-60, 140);
+        manPath.lineTo(-55, 130);
+        manPath.lineTo(-60, 125);
+        manPath.lineTo(-50, 120);
+        manPath.lineTo(-70, 90);
+        manPath.lineTo(-50, 50);
+        manPath.lineTo(0, 0);
         
-        <div class="marquee-container">
-            <marquee scrollamount="8">/// ANALOG VIBES // VINTAGE MAGAZINE HALFTONE // MOEBIUS MEETS BRATBY // 忧郁的色彩 // 80S PRINTING ERROR ///</marquee>
-        </div>
+        ctx.fillStyle = settings.silhouetteColor;
+        ctx.fill(manPath);
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeStyle = '#000';
+        ctx.stroke(manPath);
 
-        <div class="viewport-wrapper">
-            <div class="sticker s-tape"></div>
-            <div id="recIndicator" class="sticker s-rec blinking">● REC</div>
-            <div class="viewport">
-                <canvas id="displayCanvas"></canvas>
-            </div>
-        </div>
+        ctx.beginPath();
+        ctx.ellipse(-20, 160, 20, 15, Math.PI/4, 0, Math.PI*2);
+        ctx.fillStyle = settings.silhouetteColor;
+        ctx.fill();
+        ctx.stroke();
 
-        <div class="controls">
-            <button id="recordBtn">START PRINTING</button>
-        </div>
-    </div>
+        ctx.beginPath();
+        ctx.moveTo(-30, 155);
+        ctx.lineTo(-60, 145);
+        ctx.lineWidth = 4 / scale;
+        ctx.strokeStyle = '#FFF';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(-60, 145, 3 / scale, 0, Math.PI*2);
+        ctx.fillStyle = '#ff4500';
+        ctx.fill();
 
-    <video id="rawVideo" autoplay playsinline muted style="display:none;"></video>
+        ctx.restore();
 
-    <script>
-        const video = document.getElementById('rawVideo');
-        const canvas = document.getElementById('displayCanvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true }); // 优化读取性能
-        const recordBtn = document.getElementById('recordBtn');
-        const recIndicator = document.getElementById('recIndicator');
-
-        // 分辨率设置：保持适中，太低了网点效果不好看
-        const w = 240; 
-        const h = 320; 
-        canvas.width = w;
-        canvas.height = h;
-
-        let isStreaming = false;
-        let mediaRecorder;
-        let recordedChunks = [];
-        let isRecording = false;
-
-        // --- 核心：新的艺术渲染引擎 ---
-
-        // 1. 定义“忧郁而大胆”的艺术色盘
-        // 放弃了纯波普色，采用了更厚重、更有插画感的颜色
-        const artPalette = [
-            [20, 25, 40],    // 深墨蓝 (代替黑色，更丰富)
-            [160, 50, 60],   // 锈红/砖红 (大胆的形状色)
-            [210, 180, 80],  // 土黄/姜黄 (用于高光和剪影)
-            [60, 100, 110],  // 灰蓝/青色 (忧郁的背景色)
-            [220, 215, 190]  // 米白/旧纸张色 (极亮部)
-        ];
-
-        // 2. 预生成纹理图案 (为了性能，不能在循环里生成)
+        // 烟雾
+        const smokeSourceX = width * 0.65 - (60 * (height * 0.0018));
+        const smokeSourceY = height * 0.35 + (145 * (height * 0.0018));
+        ctx.fillStyle = `rgba(255, 255, 255, ${settings.smokeOpacity})`;
         
-        // 创建半色调网点 (Halftone Pattern)
-        const halftoneCanvas = document.createElement('canvas');
-        halftoneCanvas.width = 8; halftoneCanvas.height = 8;
-        const hCtx = halftoneCanvas.getContext('2d');
-        hCtx.fillStyle = '#000';
-        // 画一个圆点
-        hCtx.beginPath(); hCtx.arc(4, 4, 3, 0, Math.PI * 2); hCtx.fill();
-        const halftonePattern = ctx.createPattern(halftoneCanvas, 'repeat');
+        particlesRef.current.forEach(p => {
+            p.x += p.vx + Math.sin(timeRef.current + p.y * 0.1) * 0.2;
+            p.y += p.vy;
+            p.life -= 0.5;
+            p.size += 0.1;
 
-        // 创建颗粒噪点 (Grain Pattern)
-        const noiseCanvas = document.createElement('canvas');
-        noiseCanvas.width = 64; noiseCanvas.height = 64;
-        const nCtx = noiseCanvas.getContext('2d');
-        for (let i = 0; i < 2000; i++) {
-            nCtx.fillStyle = `rgba(0,0,0,${Math.random() * 0.2})`; // 半透明黑点
-            nCtx.fillRect(Math.random()*64, Math.random()*64, 1, 1);
-            nCtx.fillStyle = `rgba(255,255,255,${Math.random() * 0.15})`; // 半透明白点
-            nCtx.fillRect(Math.random()*64, Math.random()*64, 1, 1);
-        }
-        const noisePattern = ctx.createPattern(noiseCanvas, 'repeat');
-
-
-        function colorDistSq(c1, c2) {
-            // 加重对亮度差异的感知
-            return (c1[0]-c2[0])**2*0.8 + (c1[1]-c2[1])**2*1.2 + (c1[2]-c2[2])**2*0.9;
-        }
-
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: {ideal: 640}, height: {ideal: 480} },
-                    audio: true
-                });
-                video.srcObject = stream;
-                video.onloadedmetadata = () => { isStreaming = true; renderFrame(); };
-            } catch (err) { alert("需要摄像头和麦克风权限。"); }
-        }
-
-        function renderFrame() {
-            if (!isStreaming) return;
-            
-            // A. 绘制原始视频并进行极端的对比度处理
-            ctx.filter = 'contrast(2.0) saturate(1.5) brightness(0.9)'; // 高对比，高饱和，稍暗
-            ctx.drawImage(video, 0, 0, w, h);
-            ctx.filter = 'none'; // 重置滤镜
-
-            // B. 获取像素数据进行色彩量化 (平涂阴影效果)
-            let imgData = ctx.getImageData(0, 0, w, h);
-            let data = imgData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                let curR = data[i], curG = data[i+1], curB = data[i+2];
-                // 简单的抖动，增加一点随机性，避免色块过于死板
-                curR += (Math.random()-0.5)*15;
-                curG += (Math.random()-0.5)*15;
-                curB += (Math.random()-0.5)*15;
-
-                let closest = artPalette[0]; let minD = Infinity;
-                for (let col of artPalette) {
-                    let d = colorDistSq([curR, curG, curB], col);
-                    if (d < minD) { minD = d; closest = col; }
-                }
-                data[i] = closest[0]; data[i+1] = closest[1]; data[i+2] = closest[2];
-                // data[i+3] (Alpha) 保持不变
+            if (p.life <= 0) {
+                p.x = smokeSourceX;
+                p.y = smokeSourceY;
+                p.life = 100;
+                p.size = Math.random() * 5 + 2;
+                p.vx = (Math.random() - 0.5) * 0.5;
+                p.vy = -(Math.random() * 0.5 + 0.5);
             }
-            ctx.putImageData(imgData, 0, 0);
-
-            // C. 绘制纹理叠加层 (关键步骤：把纹理画死在画布上)
-
-            // 1. 叠加半色调网点层 (Overlay 模式)
-            ctx.globalCompositeOperation = 'overlay';
-            ctx.fillStyle = halftonePattern;
-            // 稍微错位一点，模拟印刷对不准
-            ctx.translate(1, 1); 
-            ctx.fillRect(-1, -1, w+2, h+2);
-            ctx.translate(-1, -1);
-
-            // 2. 叠加颗粒噪点层 (Multiply 模式，增加脏感)
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.fillStyle = noisePattern;
-            ctx.globalAlpha = 0.6; // 噪点强度
-            ctx.fillRect(0, 0, w, h);
-            ctx.globalAlpha = 1.0;
-            
-            // 重置混合模式
-            ctx.globalCompositeOperation = 'source-over';
-
-            requestAnimationFrame(renderFrame);
-        }
-
-        // --- 录像逻辑 (保持不变) ---
-        function startRecording() {
-            recordedChunks = [];
-            // 捕捉画布流 (30FPS)
-            const canvasStream = canvas.captureStream(30);
-            if (video.srcObject && video.srcObject.getAudioTracks().length > 0) {
-                canvasStream.addTrack(video.srcObject.getAudioTracks()[0]);
-            }
-            let options = { mimeType: 'video/webm;codecs=vp9' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-            
-            try {
-                mediaRecorder = new MediaRecorder(canvasStream, options);
-            } catch(e) { alert('录制初始化失败'); return; }
-
-            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none'; a.href = url; a.download = 'SILKSCREEN-TAPE-' + Date.now() + '.webm';
-                document.body.appendChild(a); a.click();
-                setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
-            };
-            mediaRecorder.start();
-            isRecording = true; updateUIState(true);
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-            isRecording = false; updateUIState(false);
-        }
-
-        function updateUIState(recording) {
-            if (recording) {
-                recordBtn.innerText = "STOP PRINTING"; recordBtn.classList.add('recording'); recIndicator.style.display = "block";
-            } else {
-                recordBtn.innerText = "START PRINTING"; recordBtn.classList.remove('recording'); recIndicator.style.display = "none";
-            }
-        }
-
-        recordBtn.addEventListener('click', () => {
-            if (!isStreaming) return;
-            if (!isRecording) startRecording(); else stopRecording();
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.stroke();
         });
+        
+        requestRef.current = requestAnimationFrame(animate);
+    };
+
+    useEffect(() => {
+        requestRef.current = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(requestRef.current);
+    }, [settings]);
+
+    useEffect(() => {
+        if (triggerSave) {
+            const canvas = canvasRef.current;
+            const link = document.createElement('a');
+            link.download = `mobius-render-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            onSaveComplete();
+        }
+    }, [triggerSave, onSaveComplete]);
+
+    return (
+        <canvas 
+            ref={canvasRef} 
+            width={800} 
+            height={800} 
+            className="w-full h-full object-cover"
+        />
+    );
+};
+
+// --- 真实摄像头渲染组件 ---
+const CameraRenderer = ({ settings, triggerSave, onSaveComplete, isActive }) => {
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+    const [error, setError] = useState('');
+
+    // 启动摄像头
+    useEffect(() => {
+        if (!isActive) return;
+
+        const startCamera = async () => {
+            try {
+                // 优先使用后置摄像头 (environment)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.play();
+                }
+            } catch (err) {
+                console.error("Camera Error:", err);
+                setError('无法访问摄像头。请检查权限或使用HTTPS/Localhost。');
+            }
+        };
 
         startCamera();
-    </script>
-</body>
-</html>
+
+        return () => {
+            // 清理流
+            if (videoRef.current && videoRef.current.srcObject) {
+                const tracks = videoRef.current.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+        };
+    }, [isActive]);
+
+    // 拍照逻辑
+    useEffect(() => {
+        if (triggerSave && videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            
+            // 设置画布尺寸与视频一致
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // 绘制当前帧
+            ctx.filter = `url(#mobiusColor) contrast(${settings.contrast}) saturate(1.2)`;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // 下载
+            const link = document.createElement('a');
+            link.download = `mobius-photo-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            onSaveComplete();
+        }
+    }, [triggerSave, onSaveComplete, settings]);
+
+    if (error) {
+        return <div className="w-full h-full flex items-center justify-center text-red-500 bg-black p-4 text-center">{error}</div>;
+    }
+
+    return (
+        <div className="w-full h-full bg-black relative">
+            <video 
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                style={{ 
+                    filter: `url(#mobiusColor) contrast(${settings.contrast}) saturate(1.2)` 
+                }}
+                playsInline
+                muted
+            />
+            {/* 隐藏的 Canvas 用于截图 */}
+            <canvas ref={canvasRef} className="hidden" />
+        </div>
+    );
+};
+
+// --- 主应用组件 ---
+export default function App() {
+    const [settings, setSettings] = useState({
+        silhouetteColor: '#FFD700', 
+        smokeOpacity: 0.6,
+        halftoneSize: 6,
+        contrast: 1.2
+    });
+
+    const [mode, setMode] = useState('simulated'); // 'simulated' | 'camera'
+    const [showControls, setShowControls] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [flash, setFlash] = useState(false);
+
+    const handleCapture = () => {
+        setFlash(true);
+        setTimeout(() => setFlash(false), 150);
+        setSaving(true);
+    };
+
+    const toggleControls = () => setShowControls(!showControls);
+    const toggleMode = () => setMode(mode === 'simulated' ? 'camera' : 'simulated');
+
+    const changeColor = () => {
+        const colors = ['#FFD700', '#FF4500', '#00FF7F', '#00BFFF', '#FF1493'];
+        const currIdx = colors.indexOf(settings.silhouetteColor);
+        const nextColor = colors[(currIdx + 1) % colors.length];
+        setSettings({...settings, silhouetteColor: nextColor});
+    };
+
+    return (
+        <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4 font-space-mono">
+            {/* 注入样式 */}
+            <style>{styles}</style>
+            
+            {/* 注入 SVG 滤镜 */}
+            <SvgFilters />
+
+            {/* 相机外壳 */}
+            <div className="relative w-full max-w-2xl bg-[#e0e0e0] rounded-3xl overflow-hidden retro-shadow flex flex-col">
+                
+                {/* 顶部装饰条 (取景器外观) */}
+                <div className="h-12 bg-[#333] flex items-center justify-between px-6 border-b-4 border-black">
+                    <div className="flex gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    </div>
+                    <div className="text-white text-xs tracking-widest font-bold flex items-center gap-2">
+                        MOBIUS LENS v2.0
+                        {mode === 'camera' && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>}
+                    </div>
+                    <div className="w-8 h-2 bg-gray-600 rounded-full"></div>
+                </div>
+
+                {/* 主取景区域 */}
+                <div className="relative aspect-square bg-black overflow-hidden group">
+                    
+                    {/* 视图层 */}
+                    {mode === 'simulated' ? (
+                        <div 
+                            className="w-full h-full transition-all duration-300"
+                            style={{ filter: `contrast(${settings.contrast}) saturate(1.2)` }}
+                        >
+                            <SceneRenderer 
+                                settings={settings} 
+                                triggerSave={saving} 
+                                onSaveComplete={() => setSaving(false)} 
+                            />
+                        </div>
+                    ) : (
+                        <CameraRenderer 
+                            settings={settings}
+                            triggerSave={saving}
+                            onSaveComplete={() => setSaving(false)}
+                            isActive={mode === 'camera'}
+                        />
+                    )}
+
+                    {/* 后期处理层 (Overlays) */}
+                    <div className="absolute inset-0 halftone-overlay" 
+                         style={{ backgroundSize: `${settings.halftoneSize}px ${settings.halftoneSize}px` }}></div>
+                    <div className="absolute inset-0 noise-overlay"></div>
+                    <div className="absolute inset-0 scanlines opacity-30"></div>
+                    
+                    {/* 闪光灯效果 */}
+                    <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 z-50 ${flash ? 'opacity-100' : 'opacity-0'}`}></div>
+
+                    {/* 屏幕内 UI */}
+                    <div className="absolute inset-0 pointer-events-none border-[20px] border-black/10 z-30"></div>
+                    <div className="absolute top-8 right-8 text-yellow-400 font-mono text-xs opacity-80 z-30 drop-shadow-md">
+                        ISO 800 <br/>
+                        MODE: {mode === 'simulated' ? 'SIM' : 'CAM'} <br/>
+                        {mode === 'camera' ? 'R-LENS' : 'V-SCENE'}
+                    </div>
+                    
+                    {/* 十字准星 */}
+                    <div className="absolute top-1/2 left-1/2 w-8 h-8 -translate-x-1/2 -translate-y-1/2 border border-white/50 opacity-50 z-30"></div>
+
+                    {/* 模式提示 */}
+                    <div className="absolute bottom-4 left-4 bg-black/50 text-white text-[10px] px-2 py-1 rounded backdrop-blur z-30">
+                        {mode === 'simulated' ? 'Generative Scene' : 'Live Camera Feed'}
+                    </div>
+                </div>
+
+                {/* 控制面板 (底部) */}
+                <div className="bg-[#f0f0f0] p-6 border-t-4 border-black relative z-40">
+                    
+                    <div className="flex justify-between items-center max-w-lg mx-auto">
+                        {/* 模式切换 (左侧) */}
+                        <button 
+                            onClick={toggleMode}
+                            className="p-4 bg-blue-300 rounded-full border-2 border-black retro-shadow-sm active-press hover:bg-blue-400 transition-colors"
+                            title="Switch Mode"
+                        >
+                            {mode === 'simulated' ? <Video size={24} color="#333" /> : <ImageIcon size={24} color="#333" />}
+                        </button>
+
+                        {/* 快门按钮 (中间) */}
+                        <button 
+                            onClick={handleCapture}
+                            className="w-20 h-20 rounded-full bg-red-500 border-4 border-black retro-shadow active-press flex items-center justify-center hover:bg-red-600 transition-colors relative"
+                            title="Capture"
+                        >
+                            <div className="w-16 h-16 rounded-full border-2 border-red-300"></div>
+                            <Camera className="absolute text-white/50" size={32} />
+                        </button>
+
+                        {/* 设置按钮 (右侧) */}
+                        <button 
+                            onClick={toggleControls}
+                            className="p-4 bg-gray-200 rounded-full border-2 border-black retro-shadow-sm active-press hover:bg-gray-300 transition-colors"
+                            title="Settings"
+                        >
+                            <Sliders size={24} color="#333" />
+                        </button>
+                    </div>
+
+                    {/* 扩展控制面板 */}
+                    {showControls && (
+                        <div className="mt-6 p-4 bg-white border-2 border-black rounded-lg animate-in slide-in-from-bottom-4 fade-in duration-200">
+                            <h3 className="text-xs font-bold uppercase mb-4 tracking-wider text-gray-500">Lens Settings</h3>
+                            
+                            <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-xs font-bold">
+                                        <label>Halftone Density</label>
+                                        <span>{settings.halftoneSize}px</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="3" 
+                                        max="12" 
+                                        step="1"
+                                        value={settings.halftoneSize}
+                                        onChange={(e) => setSettings({...settings, halftoneSize: parseInt(e.target.value)})}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-xs font-bold">
+                                        <label>Contrast Boost</label>
+                                        <span>{settings.contrast}</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="1" 
+                                        max="3" 
+                                        step="0.1"
+                                        value={settings.contrast}
+                                        onChange={(e) => setSettings({...settings, contrast: parseFloat(e.target.value)})}
+                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 版权/说明 */}
+            <div className="fixed bottom-4 right-4 text-white/30 text-[10px] font-mono">
+                GEN_ID: 80S_MOBIUS_002
+            </div>
+
+        </div>
+    );
+}
