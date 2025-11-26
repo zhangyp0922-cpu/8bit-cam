@@ -3,135 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POP-ART CAM</title>
+    <title>WARNING: COOL CAM</title>
     <style>
-        /* 引入一种粗犷的复古字体 */
-        @import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&display=swap');
-
+        /* 强制使用“丑”字体，没有就用系统默认的粗体 */
         body {
-            background-color: #FFD700; /* 波普黄背景 */
-            color: #000;
-            font-family: 'Rubik Mono One', sans-serif;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
             margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            background: repeating-linear-gradient(
+                45deg,
+                #f2ff00,
+                #f2ff00 20px,
+                #000000 20px,
+                #000000 40px
+            );
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            text-transform: uppercase;
         }
 
-        .container {
+        /* 模拟一个乱七八糟的弹窗 */
+        .window-frame {
+            background: #ff00ff;
+            border: 4px solid #000;
             width: 90%;
             max-width: 400px;
-            border: 8px solid #000;
+            box-shadow: 15px 15px 0 rgba(0,0,0,0.8);
+            transform: rotate(-2deg); /* 整个界面稍微歪一点 */
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        /* 顶部标题栏 */
+        .title-bar {
+            background: #000;
+            color: #fff;
+            padding: 5px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+        .close-btn { cursor: pointer; color: #ff0000; }
+
+        /* 滚动字幕区域 */
+        .marquee-container {
             background: #fff;
-            padding: 10px;
-            box-shadow: 15px 15px 0px #000; /* 硬朗的阴影 */
+            border-bottom: 4px solid #000;
+            color: #0000ff;
+            font-weight: bold;
+            padding: 2px 0;
+            font-size: 12px;
         }
 
-        .header-text {
-            text-align: center;
-            font-size: 20px;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 0 #FF00FF; /* 颜色错位效果 */
+        .viewport-wrapper {
+            padding: 15px;
+            position: relative;
         }
 
+        /* 取景框 */
         .viewport {
             width: 100%;
             aspect-ratio: 3/4;
             background: #000;
             border: 4px solid #000;
             position: relative;
+            /* 给边框加个抖动动画 */
+            animation: shake 5s infinite;
         }
 
         canvas {
             width: 100%;
             height: 100%;
-            /* 保持像素清晰，不要模糊 */
             image-rendering: pixelated;
+            display: block;
         }
+
+        /* 搞怪装饰贴纸 */
+        .sticker {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+            filter: drop-shadow(3px 3px 0 #000);
+        }
+        .s-tape { top: -10px; left: 30%; background: #ddd; width: 40%; height: 20px; transform: rotate(2deg); opacity: 0.8; }
+        .s-eye { bottom: -15px; right: -10px; font-size: 40px; transform: rotate(-20deg); }
+        .s-wow { top: 10px; left: -15px; background: yellow; color: red; padding: 2px 5px; font-weight: bold; border: 2px solid black; transform: rotate(-15deg); }
 
         .controls {
             display: flex;
             justify-content: center;
-            margin-top: 20px;
-            gap: 20px;
+            gap: 15px;
+            margin-top: 5px;
         }
 
+        /* 不规则的按钮 */
         button {
-            background: #FF00FF; /* 玫红 */
-            border: 4px solid #000;
-            color: #fff;
+            border: 3px solid #000;
             font-family: inherit;
-            font-size: 16px;
-            padding: 15px 30px;
+            font-weight: 900;
+            font-size: 18px;
             cursor: pointer;
-            box-shadow: 6px 6px 0px #000;
+            box-shadow: 5px 5px 0 #000;
+            transition: transform 0.1s;
         }
+        
         button:active {
-            transform: translate(4px, 4px);
-            box-shadow: 2px 2px 0px #000;
-            background: #00FFFF; /* 点击变青色 */
+            transform: translate(3px, 3px);
+            box-shadow: 2px 2px 0 #000;
+        }
+
+        #snapBtn {
+            background: #00ff00;
             color: #000;
+            padding: 15px 20px;
+            transform: rotate(2deg);
+            border-radius: 50% 20% 50% 20%; /* 奇怪的形状 */
         }
 
         #saveBtn {
-            background: #00FFFF;
+            background: #00ffff;
             color: #000;
+            padding: 15px 10px;
+            transform: rotate(-3deg);
         }
+
+        @keyframes shake {
+            0% { transform: translate(0, 0); }
+            2% { transform: translate(2px, 2px); }
+            4% { transform: translate(-2px, 0); }
+            6% { transform: translate(0, 0); }
+            100% { transform: translate(0, 0); }
+        }
+
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="header-text">POP-ART COMIC LENS</div>
-        <div class="viewport">
-            <canvas id="displayCanvas"></canvas>
+    <div class="window-frame">
+        <div class="title-bar">
+            <span>ERROR_404: REALITY_NOT_FOUND</span>
+            <span class="close-btn">[X]</span>
         </div>
+        
+        <div class="marquee-container">
+            <marquee scrollamount="10">WARNING: HIGH VOLTAGE // DO NOT FEED THE PIXELS // 警告：内有恶犬 // 100% NO AI // WOW SO COOL //</marquee>
+        </div>
+
+        <div class="viewport-wrapper">
+            <div class="sticker s-tape"></div>
+            <div class="sticker s-wow">HOT!</div>
+            <div class="viewport">
+                <canvas id="displayCanvas"></canvas>
+                <div class="sticker s-eye">👀</div>
+            </div>
+        </div>
+
         <div class="controls">
-            <button id="snapBtn">SHOOT</button>
-            <button id="saveBtn" style="display:none;">SAVE</button>
+            <button id="snapBtn">BOOM!</button>
+            <button id="saveBtn" style="display:none;">STEAL IT</button>
         </div>
     </div>
 
     <video id="rawVideo" autoplay playsinline style="display:none;"></video>
 
     <script>
+        // 核心 JS 逻辑保持不变，因为这是你喜欢的滤镜效果
         const video = document.getElementById('rawVideo');
         const canvas = document.getElementById('displayCanvas');
         const ctx = canvas.getContext('2d');
         const snapBtn = document.getElementById('snapBtn');
         const saveBtn = document.getElementById('saveBtn');
 
-        // --- 设置 ---
-        const w = 120; // 处理分辨率宽
-        const h = 160; // 处理分辨率高 (3:4)
+        const w = 120; 
+        const h = 160; 
         canvas.width = w;
         canvas.height = h;
 
-        // 边缘检测阈值：越小描边越多越杂，越大描边越少越干净
-        const edgeThreshold = 40; 
+        const edgeThreshold = 35; // 稍微调低一点让描边更多，更脏
 
-        // --- 波普艺术色盘 (参考原图风格) ---
-        // 格式 [R, G, B]
+        // 波普色盘
         const popPalette = [
-            [255, 220, 0],   // 亮黄
-            [160, 30, 120],  // 深紫红
-            [0, 150, 130],   // 青绿
-            [20, 20, 20],    // 近乎黑
-            [240, 240, 240]  // 近乎白
+            [255, 255, 0],   // 纯黄
+            [255, 0, 255],   // 纯洋红
+            [0, 255, 255],   // 纯青
+            [50, 50, 50],    // 深灰
+            [255, 255, 255]  // 白
         ];
 
         let isStreaming = false;
         let animationId;
 
-        // 计算亮度
         function getBrightness(r, g, b) {
             return 0.299 * r + 0.587 * g + 0.114 * b;
         }
-        // 计算颜色距离
         function colorDistSq(c1, c2) {
             return (c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2;
         }
@@ -144,7 +212,7 @@
                 });
                 video.srcObject = stream;
                 video.play();
-            } catch (err) { alert("需HTTPS或localhost访问"); }
+            } catch (err) { alert("Camera broken? Try HTTPS."); }
         }
 
         video.addEventListener('loadedmetadata', () => {
@@ -154,101 +222,75 @@
 
         function renderFrame() {
             if (!isStreaming) return;
-
-            // 1. 绘制原始小图
-            // 简单拉伸绘制，计算边缘需要像素对其
             ctx.drawImage(video, 0, 0, w, h);
-
-            // 2. 获取原始像素数据 (只读)
             let srcData = ctx.getImageData(0, 0, w, h).data;
-            // 3. 创建新的输出像素数据 (写入)
             let outputImgData = ctx.createImageData(w, h);
             let dstData = outputImgData.data;
 
-            // --- 核心循环：边缘检测 + 色彩概括 ---
-            // 我们跳过最外一圈像素，因为它们没有完整的邻居
             for (let y = 1; y < h - 1; y++) {
                 for (let x = 1; x < w - 1; x++) {
                     let idx = (y * w + x) * 4;
-
-                    // A. --- 边缘检测 (简易 Sobel) ---
-                    // 获取上下左右四个邻居的索引
                     let idxL = (y * w + (x - 1)) * 4;
                     let idxR = (y * w + (x + 1)) * 4;
                     let idxT = ((y - 1) * w + x) * 4;
                     let idxB = ((y + 1) * w + x) * 4;
 
-                    // 计算邻居亮度
                     let briL = getBrightness(srcData[idxL], srcData[idxL+1], srcData[idxL+2]);
                     let briR = getBrightness(srcData[idxR], srcData[idxR+1], srcData[idxR+2]);
                     let briT = getBrightness(srcData[idxT], srcData[idxT+1], srcData[idxT+2]);
                     let briB = getBrightness(srcData[idxB], srcData[idxB+1], srcData[idxB+2]);
 
-                    // 计算水平和垂直方向的亮度差
-                    let deltaX = Math.abs(briL - briR);
-                    let deltaY = Math.abs(briT - briB);
-                    // 总边缘强度
-                    let edgeStrength = deltaX + deltaY;
+                    let edgeStrength = Math.abs(briL - briR) + Math.abs(briT - briB);
 
                     if (edgeStrength > edgeThreshold) {
-                        // --- 是边缘，画黑色描边 ---
-                        dstData[idx] = 0;   // R
-                        dstData[idx+1] = 0; // G
-                        dstData[idx+2] = 0; // B
-                        dstData[idx+3] = 255; // Alpha
+                        dstData[idx] = 0; dstData[idx+1] = 0; dstData[idx+2] = 0; dstData[idx+3] = 255;
                     } else {
-                        // --- 不是边缘，进行色彩概括 ---
-                        let curR = srcData[idx];
-                        let curG = srcData[idx+1];
-                        let curB = srcData[idx+2];
-
-                        // 寻找最近的波普色
+                        let curR = srcData[idx], curG = srcData[idx+1], curB = srcData[idx+2];
                         let closest = popPalette[0];
                         let minD = Infinity;
                         for (let col of popPalette) {
                             let d = colorDistSq([curR, curG, curB], col);
                             if (d < minD) { minD = d; closest = col; }
                         }
-                        
-                        dstData[idx] = closest[0];
-                        dstData[idx+1] = closest[1];
-                        dstData[idx+2] = closest[2];
-                        dstData[idx+3] = 255;
+                        dstData[idx] = closest[0]; dstData[idx+1] = closest[1]; dstData[idx+2] = closest[2]; dstData[idx+3] = 255;
                     }
                 }
             }
-
-            // 4. 将处理好的数据放回画布
             ctx.putImageData(outputImgData, 0, 0);
             animationId = requestAnimationFrame(renderFrame);
         }
 
-        // 交互逻辑
         snapBtn.addEventListener('click', () => {
             if (isStreaming) {
                 isStreaming = false;
                 cancelAnimationFrame(animationId);
                 video.pause();
-                snapBtn.innerText = "RESET";
+                // 搞怪文案
+                snapBtn.innerText = "NO NO NO";
+                snapBtn.style.background = "#ff0000";
+                snapBtn.style.color = "#fff";
                 saveBtn.style.display = "block";
             } else {
                 isStreaming = true;
                 video.play();
                 renderFrame();
-                snapBtn.innerText = "SHOOT";
+                snapBtn.innerText = "BOOM!";
+                snapBtn.style.background = "#00ff00";
+                snapBtn.style.color = "#000";
                 saveBtn.style.display = "none";
             }
         });
 
         saveBtn.addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = 'POPART-' + Date.now() + '.png';
+            link.download = 'TRASH-CAM-' + Date.now() + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
+            // 保存后给个反馈
+            alert("SAVED TO DISK!!!\n已保存！！！");
         });
 
         startCamera();
-
     </script>
 </body>
 </html>
