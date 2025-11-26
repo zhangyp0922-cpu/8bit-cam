@@ -3,238 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GB Camera</title>
+    <title>Riso-Cam 3:4</title>
     <style>
-        /* 引入复古像素字体 */
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
-        /* Game Boy 经典四色调色板定义 */
-        :root {
-            --gb-darkest: #0f380f;
-            --gb-dark: #306230;
-            --gb-light: #8bac0f;
-            --gb-lightest: #9bbc0f;
-            --gb-body: #c0c0c0; /* 机身灰 */
-            --gb-bezel: #555555; /* 屏幕边框深灰 */
-            --gb-btn-ab: #A020F0; /* A/B按钮紫 */
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
         body {
-            background-color: #222;
-            font-family: 'Press Start 2P', monospace;
+            background-color: #111;
+            color: #fff;
+            font-family: 'Space Mono', monospace;
             margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            /* 防止手机端橡皮筋效果 */
-            overflow: hidden;
-            touch-action: none;
-        }
-
-        /* Game Boy 主机身 */
-        #gb-body {
-            background-color: var(--gb-body);
-            width: 90%;
-            max-width: 400px;
-            border-radius: 10px 10px 40px 10px;
-            padding: 20px;
-            box-shadow: inset -4px -4px 10px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
             align-items: center;
-            position: relative;
-        }
-
-        /* 屏幕深色边框 */
-        .screen-bezel {
-            background-color: var(--gb-bezel);
-            padding: 15px 20px 30px 20px; /* 底部留空多一点写字 */
-            border-radius: 5px 5px 20px 5px;
-            width: 85%;
-            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5);
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        /* 屏幕边框上的文字 */
-        .bezel-text {
-            color: #999;
-            font-size: 8px;
-            position: absolute;
-            width: 100%;
-            text-align: center;
-            bottom: 10px;
-            left: 0;
-        }
-        .bezel-top-text {
-             color: #ccc;
-             font-size: 10px;
-             position: absolute;
-             top: 5px;
-             left: 15px;
-        }
-
-        /* 实际的绿色屏幕区域 */
-        .viewport {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 10/9; /* 接近 GB原本比例 */
-            background: var(--gb-lightest); /* 没画面时显示最亮绿 */
-            border: 3px solid #333;
-            box-shadow: inset 2px 2px 8px rgba(0,0,0,0.4);
+            justify-content: center;
+            height: 100vh;
             overflow: hidden;
         }
 
-        /* 核心：将 Canvas 强制拉伸并保持像素化 */
-        #displayCanvas {
-            width: 100%;
-            height: 100%;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            /* 稍微降低一点对比度模仿旧屏幕 */
-            filter: contrast(1.2) brightness(0.9);
-        }
-
-        /* 操控区域 */
-        .controls-area {
+        /* 相机外壳：极简工业风 */
+        .camera-body {
+            background: #222;
+            width: 90%;
+            max-width: 420px;
+            /* 适配内容高度 */
+            padding: 20px; 
+            border-radius: 2px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            border: 1px solid #333;
             display: flex;
-            width: 100%;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
-            padding: 0 20px;
         }
 
-        /* 装饰性的十字键 (不可点) */
-        .d-pad-deco {
-            width: 80px;
-            height: 80px;
-            position: relative;
-        }
-        .d-pad-deco::before, .d-pad-deco::after {
-            content: '';
-            position: absolute;
-            background-color: #333;
-            border-radius: 4px;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
-        }
-        .d-pad-deco::before { width: 80px; height: 26px; top: 27px; left: 0; }
-        .d-pad-deco::after { width: 26px; height: 80px; top: 0; left: 27px; }
-        .d-pad-center {
-             position: absolute; width: 26px; height: 26px; top: 27px; left: 27px; background: #333; z-index: 2;
-        }
-
-
-        /* A/B 按钮组 */
-        .ab-buttons {
-            display: flex;
-            gap: 15px;
-            transform: rotate(-15deg); /* 经典的倾斜排列 */
-            margin-top: 20px;
-        }
-
-        /* 按钮样式 */
-        button {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--gb-btn-ab);
-            border: none;
-            color: #fff;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 10px;
-            cursor: pointer;
-            box-shadow: 4px 4px 8px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(0,0,0,0.3);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-            /* 禁用长按选中文本 */
-            user-select: none; 
-            -webkit-user-select: none;
-        }
-        
-        button:active {
-            transform: scale(0.95);
-            box-shadow: 2px 2px 4px rgba(0,0,0,0.4), inset 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        #saveBtn {
-            /* Save 按钮稍微改个色区分一下，虽然原版都是紫色 */
-            filter: hue-rotate(-20deg);
-        }
-
-        .button-label {
-            position: absolute;
-            bottom: -18px;
+        /* 3:4 画幅容器 */
+        .viewport-container {
             width: 100%;
-            text-align: center;
-            font-size: 8px;
-            color: var(--gb-btn-ab);
+            /* 宽高比 3:4 = 0.75 */
+            aspect-ratio: 3/4;
+            background: #000;
+            position: relative;
+            border: 2px solid #fff;
+            margin-bottom: 20px;
+            overflow: hidden;
         }
 
-        .scanline {
-            position: absolute;
-            top: 0;
-            left: 0;
+        canvas {
             width: 100%;
             height: 100%;
-            /* GB的网格感更强 */
-            background: repeating-linear-gradient(
-                to bottom,
-                transparent 0px,
-                transparent 2px,
-                rgba(0, 0, 0, 0.15) 2px,
-                rgba(0, 0, 0, 0.15) 4px
-            );
-            pointer-events: none;
-            z-index: 10;
+            /* 关键：保持像素颗粒清晰 */
+            image-rendering: pixelated;
         }
 
-        /* 装饰性的 Start/Select */
-        .start-select-deco {
+        /* 颗粒噪点叠加层（增强质感） */
+        .noise-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMDAlJyBoZWlnaHQ9JzIwMCUnPjxmaWx0ZXIgaWQ9J24nPjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjc1JyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0ndHJhbnNwYXJlbnQnLz48cmVjdCB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyBmaWx0ZXI9J3VybCgjbiknIG9wYWNpdHk9JzAuMTUnLz48L3N2Zz4=');
+            opacity: 0.3;
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+
+        .controls {
             display: flex;
-            gap: 15px;
-            margin-top: 30px;
-            transform: rotate(-15deg);
+            justify-content: space-between;
+            width: 100%;
+            align-items: center;
         }
-        .pill-btn {
-            width: 40px; height: 12px; background: #333; border-radius: 10px;
-            box-shadow: inset -1px -1px 2px rgba(0,0,0,0.5);
+
+        button {
+            background: transparent;
+            border: 2px solid #fff;
+            color: #fff;
+            font-family: 'Space Mono', monospace;
+            font-size: 14px;
+            padding: 12px 24px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: all 0.1s;
         }
+
+        button:active {
+            background: #fff;
+            color: #000;
+        }
+
+        #snapBtn {
+            background: #f00; /* 红色快门 */
+            border-color: #f00;
+            color: #000;
+        }
+        #snapBtn:active {
+            background: #fff;
+            border-color: #fff;
+        }
+
+        .meta-info {
+            font-size: 10px;
+            color: #666;
+            margin-top: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+        }
+
     </style>
 </head>
 <body>
 
-    <div id="gb-body">
-        <div class="screen-bezel">
-            <div class="bezel-top-text">DOT MATRIX WITH STEREO SOUND</div>
-            <div class="viewport">
-                 <div class="scanline"></div>
-                <canvas id="displayCanvas"></canvas>
-            </div>
-            <div class="bezel-text">GAME BOY CAMERA</div>
+    <div class="camera-body">
+        <div class="viewport-container">
+            <canvas id="displayCanvas"></canvas>
+            <div class="noise-overlay"></div>
         </div>
 
-        <div class="controls-area">
-            <div class="d-pad-deco">
-                <div class="d-pad-center"></div>
-            </div>
-            
-            <div class="ab-buttons">
-                <div style="position:relative;">
-                    <button id="saveBtn" style="display:none;">SAVE</button>
-                    <div class="button-label" style="right: -10px;">B</div>
-                </div>
-                <div style="position:relative;">
-                     <button id="snapBtn">SHOOT</button>
-                     <div class="button-label" style="right: -10px;">A</div>
-                </div>
-            </div>
+        <div class="controls">
+            <button id="switchBtn" style="font-size:12px;">CAM ↻</button>
+            <button id="snapBtn">SHOOT</button>
+            <button id="saveBtn" style="display:none;">SAVE</button>
         </div>
-
-        <div class="start-select-deco">
-            <div class="pill-btn"></div>
-            <div class="pill-btn"></div>
+        
+        <div class="meta-info">
+            <span>RISO-GRAIN v2.0</span>
+            <span>RATIO 3:4</span>
         </div>
-
     </div>
 
     <video id="rawVideo" autoplay playsinline style="display:none;"></video>
@@ -245,55 +138,53 @@
         const ctx = canvas.getContext('2d');
         const snapBtn = document.getElementById('snapBtn');
         const saveBtn = document.getElementById('saveBtn');
+        const switchBtn = document.getElementById('switchBtn');
 
-        // --- 关键修改 1: 调低分辨率以获得更大的像素点 ---
-        // 之前的 128 改为 64，像素颗粒感瞬间翻倍
-        const lowResWidth = 64; 
-        let lowResHeight = 0;
-
-        // --- 关键修改 2: 定义 Game Boy 的四色调色板 (RGB数组) ---
-        // 0: Darkest, 1: Dark, 2: Light, 3: Lightest
-        const gbPaletteRGB = [
-            [15, 56, 15],  // #0f380f 最深绿
-            [48, 98, 48],  // #306230 深绿
-            [139, 172, 15],// #8bac0f 浅绿
-            [155, 188, 15] // #9bbc0f 最浅绿 (背景)
-        ];
-
+        // --- 设置 ---
+        // 宽度设为 160，高度按 3:4 计算即 213 (160 * 1.333)
+        // 这个分辨率比 GameBoy 高，能保留更多细节，但又有足够的像素颗粒感
+        const renderWidth = 160; 
+        const renderHeight = 213; 
+        
         let isStreaming = false;
         let animationId;
+        let currentFacingMode = "environment"; // 默认后置
+
+        // 拜耳矩阵 (Bayer Matrix) 4x4
+        // 用来决定像素是否“点亮”，制造噪点渐变效果
+        // 数值范围 0-64
+        const bayerMatrix = [
+            [ 0, 32,  8, 40],
+            [48, 16, 56, 24],
+            [12, 44,  4, 36],
+            [60, 28, 52, 20]
+        ];
 
         async function startCamera() {
+            if (isStreaming) {
+                video.pause();
+                isStreaming = false;
+            }
             try {
-                // 优先尝试后置摄像头，如果失败则使用默认
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: "environment" } },
+                    video: { 
+                        facingMode: currentFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
                     audio: false
                 });
                 video.srcObject = stream;
                 video.play();
             } catch (err) {
                 console.error("Camera Error:", err);
-                // 如果后置调用失败，尝试不指定模式
-                try {
-                     const streamFallback = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                     video.srcObject = streamFallback;
-                     video.play();
-                } catch (fallbackErr) {
-                    alert("无法访问摄像头，请检查权限或使用 HTTPS/Localhost。");
-                }
+                alert("无法启动摄像头。请确保使用 HTTPS 访问。");
             }
         }
 
         video.addEventListener('loadedmetadata', () => {
-            // 计算一个接近方形的比例，模仿 GB 屏幕
-            const aspectRatio = video.videoHeight / video.videoWidth;
-            lowResHeight = Math.floor(lowResWidth * aspectRatio);
-            
-            // 设置画布的物理像素为超低分辨率 (如 64x48)
-            canvas.width = lowResWidth;
-            canvas.height = lowResHeight;
-            
+            canvas.width = renderWidth;
+            canvas.height = renderHeight;
             isStreaming = true;
             renderFrame();
         });
@@ -301,79 +192,108 @@
         function renderFrame() {
             if (!isStreaming) return;
 
-            // 1. 将视频帧绘制到微小的画布上 (产生锯齿基础)
-            ctx.drawImage(video, 0, 0, lowResWidth, lowResHeight);
+            // 1. 裁剪绘制：实现 cover 效果 (填满 3:4 比例，不拉伸)
+            const vidW = video.videoWidth;
+            const vidH = video.videoHeight;
+            const targetRatio = renderWidth / renderHeight; // 0.75
+            const vidRatio = vidW / vidH;
 
-            // 2. 获取像素数据
-            let imageData = ctx.getImageData(0, 0, lowResWidth, lowResHeight);
-            let data = imageData.data;
+            let sx, sy, sWidth, sHeight;
 
-            // 3. 核心算法：遍历像素并强制映射到 GB 四色
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-
-                // 计算当前像素的亮度 (简单的平均值法)
-                const brightness = (r + g + b) / 3;
-
-                // 根据亮度决定使用哪一种绿色
-                let colorIndex;
-                if (brightness < 65) { // 阈值可以微调
-                    colorIndex = 0; // 最深
-                } else if (brightness < 130) {
-                    colorIndex = 1; // 深
-                } else if (brightness < 195) {
-                    colorIndex = 2; // 浅
-                } else {
-                    colorIndex = 3; // 最浅
-                }
-
-                // 替换原像素颜色
-                data[i]     = gbPaletteRGB[colorIndex][0]; // R
-                data[i + 1] = gbPaletteRGB[colorIndex][1]; // G
-                data[i + 2] = gbPaletteRGB[colorIndex][2]; // B
-                // data[i+3] 是 Alpha 通道，保持不变
+            if (vidRatio > targetRatio) {
+                // 视频比画布宽，裁剪两边
+                sHeight = vidH;
+                sWidth = sHeight * targetRatio;
+                sy = 0;
+                sx = (vidW - sWidth) / 2;
+            } else {
+                // 视频比画布高，裁剪上下
+                sWidth = vidW;
+                sHeight = sWidth / targetRatio;
+                sx = 0;
+                sy = (vidH - sHeight) / 2;
             }
 
-            // 4. 将处理后的像素放回画布
-            ctx.putImageData(imageData, 0, 0);
+            // 将视频帧绘制到小画布上
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, renderWidth, renderHeight);
 
+            // 2. 获取像素数据
+            let imageData = ctx.getImageData(0, 0, renderWidth, renderHeight);
+            let data = imageData.data;
+
+            // 3. 算法核心：RGB 抖动 (Ordered Dithering)
+            for (let y = 0; y < renderHeight; y++) {
+                for (let x = 0; x < renderWidth; x++) {
+                    const i = (y * renderWidth + x) * 4;
+
+                    // 获取当前像素在拜耳矩阵中的阈值 (0-64)
+                    // 乘以 4 将其扩展到 0-256 范围，作为对比基准
+                    let mapValue = bayerMatrix[y % 4][x % 4] * 4;
+
+                    // 稍微提高对比度：让亮部更亮，暗部更暗
+                    // 也可以调整这里的数值来改变“曝光度”
+                    const contrast = 1.2; 
+                    
+                    let r = data[i];
+                    let g = data[i + 1];
+                    let b = data[i + 2];
+
+                    // 核心逻辑：
+                    // 如果 (当前颜色值 + 矩阵阈值) > 255，则该像素通道设为高亮，否则设为暗。
+                    // 这种处理会让中间色调变成“红点”和“黑点”的混合，产生那种复古印刷质感。
+                    
+                    // 这里我们做 "2-bit" 量化 (每个通道只有几个阶梯)，增加色彩丰富度但保持噪点
+                    // 阶梯数：值越小，色块越明显；值越大，越细腻。
+                    const steps = 2; // 尝试改为 1 就会变成纯粹的 8 色 (红黄蓝绿青品黑白)
+                    const stepSize = 255 / steps; // 127.5
+
+                    data[i]     = Math.floor((r * contrast + mapValue) / stepSize) * stepSize;
+                    data[i + 1] = Math.floor((g * contrast + mapValue) / stepSize) * stepSize;
+                    data[i + 2] = Math.floor((b * contrast + mapValue) / stepSize) * stepSize;
+                    
+                    // 简单的噪点增强 (模拟 ISO 颗粒)
+                    // data[i] += (Math.random() - 0.5) * 10;
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
             animationId = requestAnimationFrame(renderFrame);
         }
 
-        // 拍照按钮逻辑 (A键)
+        // 拍照
         snapBtn.addEventListener('click', () => {
             if (isStreaming) {
                 isStreaming = false;
                 cancelAnimationFrame(animationId);
                 video.pause();
-                
                 snapBtn.innerText = "RESET";
-                saveBtn.style.display = "block"; // 显示 B键 (Save)
+                snapBtn.style.background = "#fff";
+                saveBtn.style.display = "block";
+                switchBtn.style.display = "none";
             } else {
                 isStreaming = true;
                 video.play();
                 renderFrame();
-                
                 snapBtn.innerText = "SHOOT";
-                saveBtn.style.display = "none"; // 隐藏 B键
+                snapBtn.style.background = "#f00";
+                saveBtn.style.display = "none";
+                switchBtn.style.display = "block";
             }
         });
 
-        // 保存按钮逻辑 (B键)
+        // 保存
         saveBtn.addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = 'GB-Photo-' + Date.now() + '.png';
-            // 导出微小的像素原图
+            link.download = 'RISO-Photo-' + Date.now() + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
         });
 
-        // 禁止双击放大，提升手机体验
-        document.addEventListener('dblclick', function(event) {
-            event.preventDefault();
-        }, { passive: false });
+        // 切换前后摄
+        switchBtn.addEventListener('click', () => {
+            currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+            startCamera();
+        });
 
         startCamera();
 
